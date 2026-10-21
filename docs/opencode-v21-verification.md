@@ -85,23 +85,84 @@ aborting its stream inside a `for await` return replaced the successful return
 with an AbortError. Native transcript and terminal events confirmed those turns
 had completed. Correcting the temporary observer resolved that harness error.
 
-## Failing case and remaining limits
+## Expanded non-TUI acceptance matrix
+
+The same four-PR server bundle was rebuilt, packed with `npm pack`, and
+installed through the real host's package resolver from the local tarball.
+The installed server bundle's SHA-256 matched the branch build. Official MIT
+CLI binaries for **2.1.0 and 2.1.2** were checked against their npm SHA-512
+integrity metadata. Each host used an isolated database/configuration and a
+scripted local provider plus a minimal local stdio MCP server. No TUI, live
+provider account, private project, screenshot or external MCP was used.
+
+Artifact SHA-256:
+`85f2a497d269aaad8e2882da40869e7bc54729ad644e842813854443ddf467d9`.
+
+The final distinct matrix contains **21 assertions per host version**:
+**20 passed and one known limitation failed on each version**. Passing safety
+refusal assertions are distinguished from successful execution below.
+
+| Area | 2.1.0 | 2.1.2 | Observed boundary |
+| --- | --- | --- | --- |
+| Packed startup | Pass | Pass | Active OMO, finalized agents and connected fixture MCP |
+| MCP allow / deny / ask-and-approve | Pass | Pass | Allowed tool executes, denied tool has no server invocation, pending request accepts `once` |
+| Rate-limit model fallback | Pass | Pass | Primary fails with 429, fallback succeeds; two requests |
+| Single transport-drop recovery | Pass | Pass | Primary retries once and succeeds; two requests, not persistent-failure failover certification |
+| Child fallback / notification identity | Pass | Pass | Model switches within one child, with one native parent notification |
+| Ordinary request prefixes | Pass | Pass | Frozen tools and all prior messages preserved across two turns |
+| Parallel graceful restart | Pass | Pass | Two concurrently held children resume under the same IDs; one completion notice each |
+| Child MCP exclusion | Pass | Pass | Denied fixture namespace absent from the child's model tool list |
+| Retained exact-ID status and native continuation | Pass | Pass | Retained text and new continuation text returned without duplicating the child |
+| Retained/non-live `task_message` | Safe refusal | Safe refusal | No input admitted without a valid live local record |
+| Tracked live `task_message` | Pass | Pass | Queued input is admitted while the child remains live |
+| Retained `task_revive` | Pass | Pass | Re-adopts the same child and produces new text |
+| Alias result after `task_revive` | Pass | Pass | New terminal text returned |
+| Alias result after native continuation | Known failure | Known failure | Correct child ID, but `running (unconfirmed)` instead of new terminal text |
+| Untracked active cancellation after SIGKILL | Safe refusal | Safe refusal | Recovery resumes the child, but cancellation does not seize untracked execution |
+| Tracked active cancellation | Pass | Pass | Native child outcome becomes interrupted |
+| Summary compaction / continuation | Pass | Pass | MCP tool output reaches the summary request; completed compaction uses `metadata.keepID`, not removed `recent` |
+| Native provider compaction / replay | Pass | Pass | Tool results reach the real Responses compaction trigger; checkpoint replays for the same model, while a model change excludes it and restores original tool output |
+
+Tests explicitly awaited MCP connection/catalog readiness. Initial harness-only
+failures used an unsupported file-form plugin target, two incorrect HTTP payload
+keys, and an overbroad child-hold matcher that also held parent completion
+notices. Affected assertions were rerun after correcting the harness; those
+errors are not classified as product regressions. The first unrecoverable
+transport-fault probe hit its observation deadline; only the bounded single-drop
+recovery case above is a passing transport claim.
+
+### Restart cache observation
+
+A separate probe compared 64 consecutive parent-request pairs across delegation,
+completion and lifecycle controls: prior messages remained unchanged. Ten tool
+array changes consisted solely of the fixture MCP tool disappearing/reappearing
+around reconnect/restart. Therefore the ordinary-turn prefix test does **not**
+establish a frozen tool prefix across restart or real provider cache efficiency.
+
+An independent run with **published, unmodified OMO 3.0.5 on 2.1.2** reproduced
+the alias failure and the MCP tool-array changes (three changes over 11 request
+pairs; prior messages again unchanged). Neither finding was introduced by these
+four PRs. MCP reconnect/catalog readiness needs separate investigation before
+claiming restart cache stability; no tool-freezing workaround was added.
+
+## Known failure and remaining limits
 
 After the successful native continuation, the warmed parent's
 `task_status({ task_id: "fix-1", result: true })` resolved the correct child ID
 but returned `state: running (unconfirmed)` instead of its terminal text. The
 child's native execution had succeeded. The assertion requiring the new text
-failed. This demonstrates a board/status reconciliation gap in the combined
-branch; it does not establish which individual PR or baseline introduced it.
-It must not be counted as a passing recovery result or a proven 2.1 regression.
+failed. The expanded matrix and the published 3.0.5 baseline both reproduce it.
+This is a pre-existing board/status reconciliation limitation, not a passing
+recovery result or a regression introduced by these four PRs.
 
 The following remain runtime gates, not passing checks:
 
-- Process-local board/concurrency reconciliation, including the failing warmed
-  alias/result case, and `task_revive` across restart.
-- The full permission/MCP matrix and actual remote MCP connections.
-- Fallback, real compaction and prompt-prefix stability through host requests.
-- Packaged npm installation on the real host, rather than directory loading.
+- Complete process-local board/concurrency reconciliation and the failing
+  warmed alias/result case. Native recovery does not restore control ownership
+  of an untracked active execution; the refusal above is intentional.
+- Arbitrary provider errors, persistent transport failure, external providers
+  and remote/OAuth MCP integrations beyond the bounded fixture matrix.
+- Restart/reconnect tool-prefix stability and real provider cache efficiency.
 - Other client applications and plugins against the test host.
 - TUI runtime compatibility: the 2.1.2 development contract declares an
   optional OpenTUI peer floor of 0.6.6; OMO's runtime pins remain 0.5.11.
