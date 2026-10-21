@@ -44,30 +44,73 @@ clients. It does not start or verify an OpenCode 2.1.2 host. Cache-prefix
 properties and snapshots passed, but real provider cache efficiency was not
 measured.
 
-## Not established
+## Isolated runtime follow-up
 
-The machine's additional-server safety policy blocked the isolated test-host
-launch command. No alternate launcher or embedded-host workaround was used.
-The downloaded test binary and empty test directories were removed.
-No live credentials, production session prompts or production restarts were
-used for this work.
+The initial additional-server policy block was lifted by the user through a
+temporary per-rule override. The override was removed after stopping the test
+processes. No alternate launcher or hidden-host workaround was used.
+
+The official MIT `@opencode/cli-linux-x64@2.1.2` binary was downloaded and its
+SHA-512 integrity checked against npm metadata. The host ran on loopback port
+43128 with separate HOME/XDG directories and a separate database. A local
+scripted OpenAI-compatible provider on port 43129 used no live credentials.
+OMO loaded from this branch's built directory/server entrypoint, not an npm
+installation. Built-in remote MCPs and automatic plugin updates were disabled.
+Production port 3020, plugin pins, session prompts and services were untouched.
+
+Observed and asserted:
+
+- The real host reported 2.1.2; OMO became active and registered its agents.
+  Initial registry reads can return empty during asynchronous startup; an
+  agent materialization/read established readiness before later assertions.
+- A scripted parent launched two native background children. Both reached
+  concurrent held provider requests before interruption.
+- After graceful shutdown, an unregistered `serve` host deliberately did not
+  resume claims. Switching to the isolated registered `serve --service` mode
+  resumed both under their original IDs and preserved their parent IDs.
+  Both succeeded and each produced one native parent completion notification.
+- A second two-child scenario was killed with SIGKILL. The next isolated
+  registered host resumed both children under their original IDs. Both succeeded;
+  the parent transcript contained exactly one completion notification per child.
+- A post-restart `task_status({ sessionID, result: true })` returned the child's
+  retained text. A native foreground continuation using that same session ID
+  returned new text and left the parent with exactly two children.
+- A child's attempted `task_status` call was rejected with a tool error under
+  its denied orchestration-tool policy. This is one enforcement case, not a
+  complete permission or MCP matrix.
+- The actual pagination shim against the real HTTP list endpoint enumerated
+  54 root sessions over pages of 50, 4 and 0, preserving the root filter.
+
+The temporary event observer initially reported two false deadline failures:
+aborting its stream inside a `for await` return replaced the successful return
+with an AbortError. Native transcript and terminal events confirmed those turns
+had completed. Correcting the temporary observer resolved that harness error.
+
+## Failing case and remaining limits
+
+After the successful native continuation, the warmed parent's
+`task_status({ task_id: "fix-1", result: true })` resolved the correct child ID
+but returned `state: running (unconfirmed)` instead of its terminal text. The
+child's native execution had succeeded. The assertion requiring the new text
+failed. This demonstrates a board/status reconciliation gap in the combined
+branch; it does not establish which individual PR or baseline introduced it.
+It must not be counted as a passing recovery result or a proven 2.1 regression.
 
 The following remain runtime gates, not passing checks:
 
-- Actual 2.1.2 startup with the packaged plugin and deferred registration.
-- Parallel children, exact-ID continuation and permission/MCP enforcement
-  exercised through the real host and a local scripted model provider.
-- Graceful and interrupted restart: execution resume, one parent notification,
-  board/concurrency reconciliation and no historical-result replay.
-- Fallback, compaction and prompt-prefix stability through real host requests.
-- OpenChamber and other loaded plugins against that host.
+- Process-local board/concurrency reconciliation, including the failing warmed
+  alias/result case, and `task_revive` across restart.
+- The full permission/MCP matrix and actual remote MCP connections.
+- Fallback, real compaction and prompt-prefix stability through host requests.
+- Packaged npm installation on the real host, rather than directory loading.
+- OpenChamber and other loaded plugins against the test host.
 - TUI runtime compatibility: the 2.1.2 development contract declares an
   optional OpenTUI peer floor of 0.6.6; OMO's runtime pins remain 0.5.11.
 
-Process-local board restoration is still incomplete. The shutdown mapping
-fix does not add a startup scan, persist aliases, or prove that interrupted
-plugin-agent execution resumes. Do not upgrade a running fan-out based only
-on these source and fixture checks.
+Process-local board restoration is still incomplete. Native child execution
+resumed in these isolated scenarios, but the shutdown mapping fix does not add
+a startup scan or persist the board. Do not upgrade a running fan-out based on
+these results; they are a bounded compatibility probe, not a full certification.
 
 ## Authoritative contracts
 
