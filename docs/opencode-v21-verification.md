@@ -46,17 +46,16 @@ measured.
 
 ## Isolated runtime follow-up
 
-The initial additional-server policy block was lifted by the user through a
-temporary per-rule override. The override was removed after stopping the test
-processes. No alternate launcher or hidden-host workaround was used.
+An initial local restriction was lifted with authorization for the isolated
+test. The restriction was restored after stopping the test processes.
 
 The official MIT `@opencode/cli-linux-x64@2.1.2` binary was downloaded and its
-SHA-512 integrity checked against npm metadata. The host ran on loopback port
-43128 with separate HOME/XDG directories and a separate database. A local
-scripted OpenAI-compatible provider on port 43129 used no live credentials.
+SHA-512 integrity checked against npm metadata. The host ran on loopback
+with separate HOME/XDG directories and a separate database. A local
+scripted OpenAI-compatible provider used no live credentials.
 OMO loaded from this branch's built directory/server entrypoint, not an npm
 installation. Built-in remote MCPs and automatic plugin updates were disabled.
-Production port 3020, plugin pins, session prompts and services were untouched.
+Existing host configuration, session data and services were untouched.
 
 Observed and asserted:
 
@@ -103,7 +102,7 @@ The following remain runtime gates, not passing checks:
 - The full permission/MCP matrix and actual remote MCP connections.
 - Fallback, real compaction and prompt-prefix stability through host requests.
 - Packaged npm installation on the real host, rather than directory loading.
-- OpenChamber and other loaded plugins against the test host.
+- Other client applications and plugins against the test host.
 - TUI runtime compatibility: the 2.1.2 development contract declares an
   optional OpenTUI peer floor of 0.6.6; OMO's runtime pins remain 0.5.11.
 
